@@ -46,6 +46,8 @@ export function useScanStatusQuery(scanId: string | undefined) {
     queryKey: ['scan-status', scanId],
     enabled: Boolean(scanId),
     refetchInterval: 2000,
+    /** Default false: polling pauses in background tabs so lanes look stuck while elapsed still runs. */
+    refetchIntervalInBackground: true,
     staleTime: 0,
     queryFn: async () => {
       const { data } = await axiosInstance.get<ScanStatusPayload>(SCANS.STATUS(scanId!))

@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 from bson import ObjectId
 from bson.errors import InvalidId
+from pymongo.errors import DuplicateKeyError
 from rapidfuzz import fuzz
 
 from rag.connectors.http_client import safe_get
@@ -177,6 +178,20 @@ async def confirm_entity(
     now = datetime.now(timezone.utc)
     legal_name = normalize_user_legal_name((legal_name or "").strip())
     dom = _normalize_domain(domain)
+    # Unique index on domain: prefer canonical row so we never insert a duplicate domain.
+    if dom:
+        owner = await db.entities.find_one({"domain": dom})
+        if owner:
+            await db.entities.update_one(
+                {"_id": owner["_id"]},
+                {"$set": {"legal_name": legal_name.strip(), "updated_at": now}},
+            )
+            return {
+                "entity_id": str(owner["_id"]),
+                "legal_name": legal_name.strip(),
+                "domain": dom,
+            }
+
     if candidate_id:
         try:
             oid = ObjectId(candidate_id)
@@ -185,11 +200,37 @@ async def confirm_entity(
         if oid is not None:
             existing = await db.entities.find_one({"_id": oid})
             if existing:
-                await db.entities.update_one(
-                    {"_id": oid},
-                    {"$set": {"legal_name": legal_name.strip(), "domain": dom or existing.get("domain"), "updated_at": now}},
-                )
-                return {"entity_id": str(oid), "legal_name": legal_name.strip(), "domain": dom or existing.get("domain")}
+                try:
+                    await db.entities.update_one(
+                        {"_id": oid},
+                        {
+                            "$set": {
+                                "legal_name": legal_name.strip(),
+                                "domain": dom or existing.get("domain"),
+                                "updated_at": now,
+                            }
+                        },
+                    )
+                except DuplicateKeyError:
+                    if not dom:
+                        raise
+                    other = await db.entities.find_one({"domain": dom})
+                    if not other:
+                        raise
+                    await db.entities.update_one(
+                        {"_id": other["_id"]},
+                        {"$set": {"legal_name": legal_name.strip(), "updated_at": now}},
+                    )
+                    return {
+                        "entity_id": str(other["_id"]),
+                        "legal_name": legal_name.strip(),
+                        "domain": dom,
+                    }
+                return {
+                    "entity_id": str(oid),
+                    "legal_name": legal_name.strip(),
+                    "domain": dom or existing.get("domain"),
+                }
 
     doc = {
         "legal_name": legal_name.strip(),
@@ -199,5 +240,21 @@ async def confirm_entity(
         "created_at": now,
         "updated_at": now,
     }
-    res = await db.entities.insert_one(doc)
+    try:
+        res = await db.entities.insert_one(doc)
+    except DuplicateKeyError:
+        if not dom:
+            raise
+        owner = await db.entities.find_one({"domain": dom})
+        if not owner:
+            raise
+        await db.entities.update_one(
+            {"_id": owner["_id"]},
+            {"$set": {"legal_name": legal_name.strip(), "updated_at": now}},
+        )
+        return {
+            "entity_id": str(owner["_id"]),
+            "legal_name": legal_name.strip(),
+            "domain": dom,
+        }
     return {"entity_id": str(res.inserted_id), "legal_name": doc["legal_name"], "domain": dom}

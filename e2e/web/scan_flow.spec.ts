@@ -75,6 +75,7 @@ test('full scan flow with mocked API', async ({ page }) => {
           hiring: { status: 'running', chunk_count: 0, connectors: [] },
           news: { status: 'running', chunk_count: 0, connectors: [] },
         }
+    const created_at = new Date(Date.now() - 2000).toISOString()
     await route.fulfill({
       status: 200,
       body: JSON.stringify({
@@ -83,6 +84,7 @@ test('full scan flow with mocked API', async ({ page }) => {
         lanes,
         total_chunks: complete ? 8 : 0,
         elapsed_seconds: 1,
+        created_at,
       }),
     })
   })

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { useLoginMutation } from '@/hooks/api/auth.hooks'
-import { getAxiosStatus } from '@/hooks/api/http'
+import { getAxiosResponseMessage, getAxiosStatus } from '@/hooks/api/http'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -51,10 +51,19 @@ export function Login() {
       }
     } catch (e) {
       const st = getAxiosStatus(e)
-      if (!navigator.onLine || st === undefined) {
-        setErr('Something went wrong. Try again.')
+      const apiMsg = getAxiosResponseMessage(e)
+      if (st === 401) {
+        setErr(apiMsg || 'Incorrect email or password.')
+      } else if (st === 429) {
+        setErr(apiMsg || 'Too many attempts. Wait a minute and try again.')
+      } else if (st !== undefined) {
+        setErr(apiMsg || 'Something went wrong. Try again.')
+      } else if (!navigator.onLine) {
+        setErr('You appear to be offline.')
       } else {
-        setErr('Incorrect email or password.')
+        setErr(
+          `Could not reach the API. Check that it is running and VITE_API_URL matches (currently ${import.meta.env.VITE_API_URL || 'http://localhost:5200'}).`,
+        )
       }
     }
   }

@@ -23,9 +23,14 @@ const axiosInstance = axios.create({
 })
 
 axiosInstance.interceptors.request.use((config) => {
-  const token = readTokenFromPersist()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  const path = String(config.url ?? '')
+  const skipAuth =
+    path.includes('/api/auth/login') || path.includes('/api/auth/register')
+  if (!skipAuth) {
+    const token = readTokenFromPersist()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
   }
   return config
 })

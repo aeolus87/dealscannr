@@ -6,6 +6,7 @@ export function handle401Error(error: unknown): void {
   if (!axios.isAxiosError(error) || error.response?.status !== 401) return
   const url = String(error.config?.url ?? '')
   if (url.includes('/api/share/')) return
+  if (url.includes('/api/auth/login') || url.includes('/api/auth/register')) return
   useAuthStore.getState().logout()
   const path = window.location.pathname
   if (!path.startsWith('/login')) {

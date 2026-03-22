@@ -50,6 +50,8 @@ export function ScanProgress() {
   const { data, error } = useScanStatusQuery(scanId)
   const [flashed, setFlashed] = useState<Record<string, boolean>>({})
   const prevStatus = useRef<Record<string, string>>({})
+  /** Re-render once per second while running so elapsed from `created_at` stays current. */
+  const [elapsedTick, setElapsedTick] = useState(0)
 
   useEffect(() => {
     document.title = 'Scan in progress — DealScannr'
@@ -86,6 +88,26 @@ export function ScanProgress() {
     return () => window.clearTimeout(t)
   }, [data?.status, navigate, scanId])
 
+  useEffect(() => {
+    if (!data || data.status === 'complete') return
+    const id = window.setInterval(() => setElapsedTick((n) => n + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [data?.status, scanId])
+
+  const scanStartMs = useMemo(() => {
+    const raw = data?.created_at
+    if (!raw) return null
+    const t = Date.parse(raw)
+    return Number.isFinite(t) ? t : null
+  }, [data?.created_at, scanId])
+
+  const displayElapsedSec = useMemo(() => {
+    if (!data) return 0
+    if (data.status === 'complete') return Math.max(0, Math.floor(data.elapsed_seconds ?? 0))
+    if (scanStartMs != null) return Math.max(0, Math.floor((Date.now() - scanStartMs) / 1000))
+    return Math.max(0, Math.floor(data.elapsed_seconds ?? 0))
+  }, [data, scanStartMs, elapsedTick])
+
   const completedLanes = useMemo(() => {
     if (!data?.lanes) return 0
     return LANES.filter((l) => {
@@ -94,7 +116,17 @@ export function ScanProgress() {
     }).length
   }, [data?.lanes])
 
-  const progressPct = (completedLanes / 4) * 100
+  const runningLanes = useMemo(() => {
+    if (!data?.lanes) return 0
+    return LANES.filter((l) => data.lanes[l]?.status === 'running').length
+  }, [data?.lanes])
+
+  const progressPct = useMemo(() => {
+    if (!data?.lanes) return 0
+    if (data.status === 'complete') return 100
+    const laneUnit = (completedLanes + runningLanes * 0.28) / 4
+    return Math.min(96, Math.round(laneUnit * 1000) / 10)
+  }, [completedLanes, runningLanes, data?.lanes, data?.status])
 
   function laneStatusText(lane: (typeof LANES)[number], status: string) {
     if (status === 'complete') return { text: 'Complete', className: 'text-[var(--green)]' }
@@ -114,7 +146,7 @@ export function ScanProgress() {
       <p className="mt-3 text-sm text-[var(--textMuted)]">
         Scanning…{' '}
         <span className="font-mono tabular-nums text-[var(--text)]">
-          {formatElapsed(data?.elapsed_seconds ?? 0)}
+          {formatElapsed(displayElapsedSec)}
         </span>{' '}
         elapsed
       </p>
@@ -129,7 +161,7 @@ export function ScanProgress() {
         {LANES.map((lane) => {
           const row = data?.lanes?.[lane]
           const st = row?.status ?? 'queued'
-          const meta = LANE_META[lane]
+          const laneInfo = LANE_META[lane]
           const { text, className } = laneStatusText(lane, st)
           const chunks = row?.chunk_count ?? 0
           const flash = flashed[lane]
@@ -146,8 +178,8 @@ export function ScanProgress() {
               <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <div className="flex items-center gap-2">
-                    {meta.icon}
-                    <span className="text-sm font-medium capitalize text-[var(--text)]">{meta.label}</span>
+                    {laneInfo.icon}
+                    <span className="text-sm font-medium capitalize text-[var(--text)]">{laneInfo.label}</span>
                   </div>
                   {st === 'failed' && row?.error ? (
                     <span className="text-[11px] text-[var(--textMuted)]">{row.error}</span>
@@ -164,9 +196,16 @@ export function ScanProgress() {
       </ul>
 
       <p className="mt-8 text-center text-sm text-[var(--textMuted)]">This usually takes 30–60 seconds</p>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface3)]">
+      <div
+        className="ds-scan-progress-track mt-4 ring-1 ring-[var(--border)] ring-inset"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progressPct)}
+        aria-label="Scan lane progress"
+      >
         <div
-          className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-500 ease-out"
+          className={`ds-scan-progress-fill ${data?.status !== 'complete' ? 'ds-scan-progress-fill--active' : ''}`}
           style={{ width: `${progressPct}%` }}
         />
       </div>

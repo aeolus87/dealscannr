@@ -17,6 +17,17 @@ logger = logging.getLogger(__name__)
 CL_SEARCH_V4 = "https://www.courtlistener.com/api/rest/v4/search/"
 CL_SEARCH_V3 = "https://www.courtlistener.com/api/rest/v3/search/"
 
+_CORP_SUFFIX = re.compile(
+    r"\b(inc\.?|llc|l\.l\.c\.|ltd\.?|corp\.?|corporation|company|co\.|plc)\b\.?",
+    re.I,
+)
+
+_CORP_DISAMBIG_WINDOW = re.compile(
+    r"\b(inc\.?|llc|l\.l\.c\.|ltd\.?|corp\.?|corporation|company|co\.|lp|plc|"
+    r"holdings|group|technologies|tech\.?|labs|ventures|intl|international)\b",
+    re.I,
+)
+
 
 def _normalize_domain_host(domain: str) -> str:
     d = (domain or "").strip()
@@ -25,6 +36,29 @@ def _normalize_domain_host(domain: str) -> str:
     if "://" not in d:
         return d.lower().split("/")[0].split(":")[0]
     return (urlparse(d).hostname or "").strip().lower()
+
+
+def _strip_corporate_suffixes(name: str) -> str:
+    return _CORP_SUFFIX.sub("", (name or "").strip()).strip(" ,.-")
+
+
+def _match_strictness_mode(legal_name: str) -> str | None:
+    """
+    None — multi-word legal name; allow light fuzzy fallback.
+    single_no_fuzz — one word, length >= 5: word-boundary match only (no fuzzy ratio).
+    short_single — one word, length <= 4: require corporate / org marker near the hit
+                    (avoids "State v. Kick" when the target is kick.com).
+    """
+    core = _strip_corporate_suffixes((legal_name or "").strip())
+    parts = [p for p in re.split(r"\s+", core) if p]
+    if len(parts) >= 2:
+        return None
+    if not parts:
+        return "short_single"
+    w = parts[0]
+    if len(w) <= 4:
+        return "short_single"
+    return "single_no_fuzz"
 
 
 def _is_versus_continuation(after: str) -> bool:
@@ -40,6 +74,36 @@ def _is_versus_continuation(after: str) -> bool:
     )
 
 
+def _caption_allows_party_name(
+    case_lower: str,
+    start: int,
+    end: int,
+    *,
+    mode: str | None,
+) -> bool:
+    """After a word-boundary match for the legal name, caption should look like a party line."""
+    after = case_lower[end:].strip()
+    if not after:
+        return True
+    if _is_versus_continuation(after):
+        return True
+    if not after[0].isalpha():
+        return True
+    # Very short trade names may span multiple tokens before "v." (e.g. "Kick Streaming Inc. v. Acme").
+    # Do not use this for single_no_fuzz — it would admit "Linear" inside "Linear Controls, Inc."
+    if mode == "short_single":
+        tail = case_lower[start : start + 160]
+        if _CORP_DISAMBIG_WINDOW.search(tail) is not None:
+            return True
+    return False
+
+
+def _corporate_disambiguation_near(case_lower: str, start: int, end: int, *, radius: int = 48) -> bool:
+    lo = max(0, start - radius)
+    hi = min(len(case_lower), end + radius)
+    return _CORP_DISAMBIG_WINDOW.search(case_lower[lo:hi]) is not None
+
+
 def _row_dedupe_key(row: dict) -> str:
     for k in ("id", "cluster_id", "cluster", "absolute_url"):
         v = row.get(k)
@@ -48,8 +112,9 @@ def _row_dedupe_key(row: dict) -> str:
     return str(id(row))
 
 
-def case_matches_entity(case_name: str, legal_name: str, domain: str) -> bool:
+def case_matches_entity(case_name: str, legal_name: str, domain: str = "") -> bool:
     """True only if the case caption plausibly names the target company (not a longer homonym)."""
+    _ = domain  # API compatibility; future: tie-break with docket/snippet domain hints
     name_lower = (legal_name or "").strip().lower()
     if len(name_lower) < 2:
         return False
@@ -57,17 +122,17 @@ def case_matches_entity(case_name: str, legal_name: str, domain: str) -> bool:
     if not case_lower.strip():
         return False
 
+    mode = _match_strictness_mode(legal_name)
     escaped = re.escape(name_lower)
     pattern = re.compile(rf"(?<![a-z0-9]){escaped}(?![a-z0-9])")
+
     for m in pattern.finditer(case_lower):
-        after = case_lower[m.end() :].strip()
-        if not after:
-            return True
-        if _is_versus_continuation(after):
-            return True
-        if not after[0].isalpha():
-            return True
-        return False
+        start, end = m.start(), m.end()
+        if mode == "short_single" and not _corporate_disambiguation_near(case_lower, start, end):
+            continue
+        if not _caption_allows_party_name(case_lower, start, end, mode=mode):
+            continue
+        return True
 
     if name_lower in case_lower:
         idx = case_lower.find(name_lower)
@@ -75,15 +140,20 @@ def case_matches_entity(case_name: str, legal_name: str, domain: str) -> bool:
         end = idx + len(name_lower)
         after_ok = end >= len(case_lower) or not case_lower[end].isalnum()
         if before_ok and after_ok:
-            after = case_lower[end:].strip()
-            if not after or _is_versus_continuation(after) or not after[0].isalpha():
-                return True
-            return False
+            if mode == "short_single" and not _corporate_disambiguation_near(case_lower, idx, end):
+                pass
+            else:
+                after = case_lower[end:].strip()
+                if not after or _is_versus_continuation(after) or not after[0].isalpha():
+                    return True
+
+    if mode in ("short_single", "single_no_fuzz"):
+        return False
 
     head = case_lower[:120]
-    if fuzz.token_sort_ratio(name_lower, head) > 82:
+    if fuzz.token_sort_ratio(name_lower, head) > 86:
         return True
-    return fuzz.partial_ratio(name_lower, head) >= 88
+    return fuzz.partial_ratio(name_lower, head) >= 92
 
 
 class CourtListenerConnector(BaseConnector):

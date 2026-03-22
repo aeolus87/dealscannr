@@ -69,10 +69,6 @@ export function Home() {
   return (
     <PublicLayout>
       <section className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-16 text-center lg:py-20">
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--accentBorder)] bg-[var(--accentSoft)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
-          <TrendingUp className="h-3.5 w-3.5" aria-hidden />
-          Used by 500+ investors
-        </div>
         <h1 className="max-w-3xl font-display text-4xl font-semibold leading-tight tracking-tight text-[var(--text)] lg:text-[56px] lg:leading-[1.05]">
           Due diligence in
           <br />

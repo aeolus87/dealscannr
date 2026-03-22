@@ -83,6 +83,8 @@ export type ScanStatusPayload = {
   lanes: Record<string, LaneRow>
   total_chunks: number
   elapsed_seconds: number
+  /** UTC instant; client derives smooth elapsed via Date.now() - Date.parse(created_at). */
+  created_at: string | null
 }
 
 export type SharedReportPayload = {

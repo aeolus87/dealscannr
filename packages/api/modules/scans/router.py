@@ -480,8 +480,11 @@ async def get_scan_status(scan_id: str, user: CurrentUser):
     total_chunks = sum(int(r.get("chunk_count") or 0) for r in runs)
     created = scan.get("created_at")
     elapsed = 0
+    created_at_iso: str | None = None
     if isinstance(created, datetime):
-        elapsed = max(0, int((datetime.now(timezone.utc) - _mongo_dt_as_utc(created)).total_seconds()))
+        created_utc = _mongo_dt_as_utc(created)
+        created_at_iso = created_utc.isoformat().replace("+00:00", "Z")
+        elapsed = max(0, int((datetime.now(timezone.utc) - created_utc).total_seconds()))
 
     return {
         "scan_id": scan_id,
@@ -489,6 +492,7 @@ async def get_scan_status(scan_id: str, user: CurrentUser):
         "lanes": lanes_out,
         "total_chunks": total_chunks,
         "elapsed_seconds": elapsed,
+        "created_at": created_at_iso,
     }
 
 

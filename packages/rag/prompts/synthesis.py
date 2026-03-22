@@ -34,13 +34,14 @@ Output a single JSON object (no markdown fences, no extra text) with this struct
 
 Rules for this JSON:
 - probe_questions: REQUIRED. Exactly three strings. These are the "before the call" questions — sharp and specific. Order: (1) legal/regulatory or its absence, (2) engineering or hiring, (3) news/funding or strategy. Each may end with [chunk_id: <id>] when grounded; omit the citation token only when no chunk supports that question (e.g. asking about missing public GitHub).
+  Each question must reference **what the evidence showed or failed to show** (e.g. "Our docket hits only matched the trade name — …" or "No indexed job postings appeared — …"); ban generic prompts like "clarify any legal issues", "approach to hiring", or "any recent developments" unless you tie them to a specific gap named in the chunks.
 - risk_triage (one-line posture): clean = no adverse signals in evidence; watch = minor concerns worth monitoring; flag = material adverse signal tied to this entity/domain; unknown = not enough evidence to tell.
 - Every factual sentence in each section's "text" must end with [chunk_id: <id>] matching an id from the evidence blocks.
 - executive_summary "text": ONE paragraph only (3–4 sentences). Do not put "Before the call, probe:" here — use probe_questions for those three questions. Cite at least 2 distinct chunk_ids in the paragraph.
 - "citations" arrays must list only chunk_id strings that appear in the evidence blocks below — each entry is the hex id alone (no "chunk_id:" prefix). In prose, use [chunk_id: <hex>] with <hex> exactly as in the evidence header; never [chunk_id: chunk_id: …] or any nested label.
 - "sections" must contain exactly the five keys above.
 - If exactly one chunk supports a section, set that section's status to "preliminary". If no chunk supports a section, set that section's status to "insufficient" and you may use "Insufficient data" in that section's text only.
-- confidence_score reflects depth/quality of evidence: thin but real citations may be 0.3–0.5; do not use 0.0 merely because text is short metadata.
+- confidence_score reflects evidence **quality**, not raw chunk count: many weak or ambiguous identity matches should lower the score; thin but on-point citations may be 0.3–0.5; do not use 0.0 merely because text is short metadata.
 - If the evidence blocks contain only ONE distinct chunk_id, you MUST NOT output verdict "MEET" (not enough independent cross-lane proof). Use "PASS" or "INSUFFICIENT" instead.
 """.strip()
 
@@ -168,12 +169,13 @@ INSTRUCTIONS:
 Using ONLY the evidence above, write a pre-call intelligence report. For each section:
 
 - WARNING — Some chunks may be about different companies that share a similar name (e.g. "Notion Accessories Inc" vs "Notion Labs Inc"). Only cite chunks where the named legal entity or filing context clearly matches {company_name} at domain {domain_display}. If a chunk names a different legal entity, note the ambiguity in that section rather than asserting it as fact about this company.
+- If court or SEC snippets match only a **short or generic** fragment of the company name, treat them as weak identity matches: summarize cautiously in legal_regulatory, prefer PASS/INSUFFICIENT over FLAG, and use probe question (1) to ask the founder to confirm whether those matters involve **this** company (name the case or filing pattern you saw).
 - CRITICAL — You MUST output exactly three strings in top-level probe_questions (see JSON schema). executive_summary.text is only the narrative paragraph (no probe bullets in that field).
 - Set risk_triage to match evidence: use flag only when a material adverse signal for THIS entity is clear; watch for minor or ambiguous risks; clean when nothing adverse showed up; unknown when coverage is too thin to tell.
 - If any chunk relates to that section (even short SEC/GitHub/jobs/news/Wikipedia stubs), synthesize what it supports and cite chunk_ids. Stub lines like "SEC Filing: 10-K filed …" are valid legal_regulatory evidence.
 - SEC filing metadata (type, date, file number, URL) counts toward legal_regulatory. Longer SEC risk-factor excerpts count heavily toward legal_regulatory.
 - GitHub / engineering connector text counts toward engineering_health.
-- Job postings count toward hiring_trends.
+- Job postings count toward hiring_trends. When there are zero hiring chunks, say listings were not found in the indexed sources — do **not** spin that into implied business problems.
 - News, Wikipedia, or web snippets count toward funding_news when they mention narrative, founders, or context; otherwise use executive_summary where appropriate.
 - Use the phrase "Insufficient data" in a section's prose only when zero chunks are relevant to that section — not when chunks are thin.
 - Every factual sentence outside the executive_summary narrative paragraph must end with [chunk_id: <id>]. probe_questions strings may omit [chunk_id: …] only when no evidence supports that question.
