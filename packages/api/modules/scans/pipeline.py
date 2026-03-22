@@ -17,6 +17,7 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from config.settings import settings as app_settings
 from rag.utils.qdrant_client_factory import qdrant_client as _make_qdrant_client
+from rag.utils.qdrant_payload_indexes import ensure_payload_indexes
 from db.mongo import get_database
 from rag.connectors.base import BaseConnector, ConnectorResult, RawChunk
 from rag.connectors.settings import ConnectorSettings
@@ -108,6 +109,7 @@ def _ensure_collection(client: QdrantClient, vector_size: int) -> None:
             collection_name=QDRANT_COLLECTION,
             vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
         )
+    ensure_payload_indexes(client, QDRANT_COLLECTION)
 
 
 def _embedding_label_and_dim() -> tuple[str, int]:

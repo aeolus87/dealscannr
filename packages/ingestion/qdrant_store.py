@@ -5,6 +5,8 @@ from bson import ObjectId
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
+from rag.utils.qdrant_payload_indexes import ensure_payload_indexes
+
 COLLECTION = "dealscannr_chunks"
 
 
@@ -15,6 +17,7 @@ def ensure_collection(client: QdrantClient, vector_size: int) -> None:
             collection_name=COLLECTION,
             vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
         )
+    ensure_payload_indexes(client, COLLECTION)
 
 
 def upsert_chunks(

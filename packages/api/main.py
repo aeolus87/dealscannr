@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -34,6 +35,25 @@ async def lifespan(app: FastAPI):
         await init_indexes()
     except Exception as e:
         log.warning("mongo_index_init_failed: %s", e)
+
+    if settings.qdrant_url:
+        try:
+
+            def _ensure_qdrant_payload_indexes() -> None:
+                from rag.utils.qdrant_client_factory import qdrant_client as _make_qdrant_client
+                from rag.utils.qdrant_payload_indexes import ensure_payload_indexes
+
+                client = _make_qdrant_client(
+                    settings.qdrant_url.rstrip("/"),
+                    settings.qdrant_api_key,
+                )
+                names = {c.name for c in client.get_collections().collections}
+                if "dealscannr_chunks" in names:
+                    ensure_payload_indexes(client, "dealscannr_chunks")
+
+            await asyncio.to_thread(_ensure_qdrant_payload_indexes)
+        except Exception as e:
+            log.warning("qdrant_payload_indexes_skipped: %s", e)
 
     try:
         from ingestion.dim_guard import verify_collection_dim_async
