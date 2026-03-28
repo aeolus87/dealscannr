@@ -22,6 +22,8 @@ async def init_indexes() -> None:
     await db.reports.create_index("entity_id")
     await db.users.create_index("email", unique=True)
     await db.scans.create_index([("user_id", 1), ("created_at", -1)])
+    await db.scans.create_index("guest_session_id")
+    await db.guest_sessions.create_index("guest_id", unique=True)
     await db.chunks.create_index("scan_id")
     await db.chunks.create_index("entity_id")
     await db.connector_runs.create_index([("scan_id", 1), ("connector_name", 1)], unique=True)

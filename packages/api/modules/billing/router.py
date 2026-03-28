@@ -25,6 +25,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
+
+def _stripe_obj_to_dict(obj: Any) -> dict[str, Any]:
+    """construct_event returns stripe.StripeObject; handlers expect dict-like .get()."""
+    if isinstance(obj, dict):
+        return obj
+    to = getattr(obj, "to_dict", None)
+    if callable(to):
+        return to()
+    try:
+        return dict(obj)
+    except Exception:
+        return {}
+
 PlanName = Literal["pro", "team"]
 
 
@@ -211,15 +224,15 @@ async def stripe_webhook(request: Request):
     etype = event["type"]
     try:
         if etype == "checkout.session.completed":
-            await _handle_checkout_completed(db, event["data"]["object"])
+            await _handle_checkout_completed(db, _stripe_obj_to_dict(event["data"]["object"]))
         elif etype == "customer.subscription.updated":
-            await _handle_subscription_updated(db, event["data"]["object"])
+            await _handle_subscription_updated(db, _stripe_obj_to_dict(event["data"]["object"]))
         elif etype == "customer.subscription.deleted":
-            await _handle_subscription_deleted(db, event["data"]["object"])
+            await _handle_subscription_deleted(db, _stripe_obj_to_dict(event["data"]["object"]))
         elif etype == "invoice.payment_failed":
-            await _handle_payment_failed(db, event["data"]["object"])
+            await _handle_payment_failed(db, _stripe_obj_to_dict(event["data"]["object"]))
         elif etype == "invoice.payment_succeeded":
-            await _handle_payment_succeeded(db, event["id"], event["data"]["object"])
+            await _handle_payment_succeeded(db, event["id"], _stripe_obj_to_dict(event["data"]["object"]))
     except Exception as e:
         logger.exception("stripe_webhook_handler_failed type=%s", etype)
         # Event is already claimed; Stripe will not retry same id — log for manual fix

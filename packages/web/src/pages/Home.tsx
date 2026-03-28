@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   FileText,
   Search,
-  TrendingUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -62,7 +61,7 @@ export function Home() {
     if (token) {
       navigate(`/dashboard?intent=scan&company=${encodeURIComponent(q)}`)
     } else {
-      navigate(`/register?intent=scan&company=${encodeURIComponent(q)}`)
+      navigate(`/try?intent=scan&company=${encodeURIComponent(q)}`)
     }
   }
 

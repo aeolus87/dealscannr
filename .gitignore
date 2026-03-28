@@ -46,6 +46,9 @@ htmlcov/
 playwright-report/
 test-results/
 
+# Remotion renders (local MP4 / frames)
+packages/video/out/
+
 # Misc
 *.swp
 *.swo

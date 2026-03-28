@@ -66,6 +66,7 @@ def test_invoice_payment_succeeded_idempotent(client, auth_headers, monkeypatch)
     )
 
     event = {
+        "object": "event",
         "id": "evt_invoice_pay_once",
         "type": "invoice.payment_succeeded",
         "data": {

@@ -19,6 +19,7 @@ from modules.batch.router import router as batch_router
 from modules.billing.router import router as billing_router
 from modules.companies.router import router as companies_router
 from modules.entity.router import router as entity_router
+from modules.guest.router import router as guest_router
 from modules.reports.router import router as reports_router
 from modules.scans.router import router as scans_router
 from modules.search.router import router as search_router
@@ -129,6 +130,7 @@ app.include_router(users_router, prefix="/api", tags=["users"])
 app.include_router(scans_router, prefix="/api", tags=["scans"])
 app.include_router(share_router, prefix="/api", tags=["share"])
 app.include_router(entity_router, prefix="/api", tags=["entity"])
+app.include_router(guest_router, prefix="/api/guest", tags=["guest"])
 app.include_router(watchlist_router, prefix="/api")
 app.include_router(batch_router, prefix="/api")
 app.include_router(api_keys_router, prefix="/api")

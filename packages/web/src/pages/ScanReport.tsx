@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, Download, RefreshCw, Share2 } from 'lucide-react'
 import { DiffModal, type ScanDiffPayload } from '@/components/scans/DiffModal'
 import { getAxiosStatus } from '@/hooks/api/http'
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { PublicLayout } from '@/components/layout/PublicLayout'
 import { useToast } from '@/components/ui/ToastContext'
 import { cn } from '@/lib/cn'
 import { normalizeVerdict, verdictStyles } from '@/lib/verdict-styles'
@@ -136,6 +137,8 @@ function ConfidenceBar({ value }: { value: number }) {
 export function ScanReport() {
   const { scanId } = useParams<{ scanId: string }>()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const isGuest = pathname.startsWith('/try/')
   const { toast } = useToast()
   const meta = readScanMeta(scanId)
   const [shareOpen, setShareOpen] = useState(false)
@@ -148,8 +151,8 @@ export function ScanReport() {
   const [diffData, setDiffData] = useState<ScanDiffPayload | null>(null)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({})
 
-  const { data, isLoading, error } = useScanReportQuery(scanId)
-  const { data: prevScan } = usePreviousScanQuery(scanId)
+  const { data, isLoading, error } = useScanReportQuery(scanId, isGuest)
+  const { data: prevScan } = usePreviousScanQuery(scanId, isGuest)
 
   const companyName = meta?.company || 'Company'
   const domain = meta?.domain || ''
@@ -292,35 +295,44 @@ export function ScanReport() {
   }
 
   if (isLoading) {
-    return (
+    const sk = (
       <div className="mx-auto max-w-3xl space-y-5 py-2">
         <Skeleton className="h-12 w-3/4 rounded-[var(--radius-md)]" />
         <Skeleton className="h-36 w-full rounded-[var(--radius-xl)]" />
         <Skeleton className="h-52 w-full rounded-[var(--radius-xl)]" />
       </div>
     )
+    return isGuest ? <PublicLayout>{sk}</PublicLayout> : sk
   }
 
   if (error || !data) {
-    return (
+    const errBody = (
       <div className="mx-auto max-w-lg py-12 text-center">
         <p className="text-sm text-[var(--red)]">Could not load report.</p>
-        <Link to="/dashboard" className="mt-4 inline-block text-sm text-[var(--accent)] underline">
-          Dashboard
+        <Link
+          to={isGuest ? '/try' : '/dashboard'}
+          className="mt-4 inline-block text-sm text-[var(--accent)] underline"
+        >
+          {isGuest ? 'Back to trial scan' : 'Dashboard'}
         </Link>
       </div>
     )
+    return isGuest ? <PublicLayout>{errBody}</PublicLayout> : errBody
   }
 
   if (data.status === 'processing' || (!data.verdict && !data.sections)) {
-    return (
+    const prog = (
       <div className="mx-auto max-w-lg py-12">
         <p className="text-sm text-[var(--yellow)]">Still processing…</p>
-        <Link to={`/scan/${scanId}/progress`} className="mt-4 inline-block text-sm text-[var(--accent)] underline">
+        <Link
+          to={isGuest ? `/try/scan/${scanId}/progress` : `/scan/${scanId}/progress`}
+          className="mt-4 inline-block text-sm text-[var(--accent)] underline"
+        >
           Back to progress
         </Link>
       </div>
     )
+    return isGuest ? <PublicLayout>{prog}</PublicLayout> : prog
   }
 
   const vKey = normalizeVerdict(data.verdict)
@@ -336,7 +348,20 @@ export function ScanReport() {
   /** Do not imply independent per-lane source counts when the index is thin. */
   const showPerLaneSourceChips = chunk >= 5
 
-  const actionRow = (
+  const actionRow = isGuest ? (
+    <div className="flex flex-wrap gap-2">
+      <Link to="/register">
+        <Button type="button" variant="primary" size="sm">
+          Save my scans — Register
+        </Button>
+      </Link>
+      <Link to="/login">
+        <Button type="button" variant="ghost" size="sm">
+          Sign in
+        </Button>
+      </Link>
+    </div>
+  ) : (
     <div className="flex flex-wrap gap-2">
       {prevScan?.previous_scan_id && (
         <Button type="button" variant="secondary" size="sm" disabled={busy || diffLoading} onClick={loadDiff}>
@@ -355,7 +380,7 @@ export function ScanReport() {
     </div>
   )
 
-  return (
+  const reportMain = (
     <div className="pb-24 text-[var(--text)] lg:pb-12">
       <DiffModal
         open={diffOpen}
@@ -635,9 +660,15 @@ export function ScanReport() {
         </p>
 
         <div className="flex flex-wrap gap-6 pb-8 text-sm">
-          <Link to="/dashboard" className="text-[var(--accent)] underline hover:text-[var(--accentHover)]">
-            Dashboard
-          </Link>
+          {isGuest ? (
+            <Link to="/try" className="text-[var(--accent)] underline hover:text-[var(--accentHover)]">
+              Trial scan
+            </Link>
+          ) : (
+            <Link to="/dashboard" className="text-[var(--accent)] underline hover:text-[var(--accentHover)]">
+              Dashboard
+            </Link>
+          )}
           <Link to="/methodology" className="text-[var(--textMuted)] underline hover:text-[var(--text)]">
             Methodology
           </Link>
@@ -645,4 +676,6 @@ export function ScanReport() {
       </div>
     </div>
   )
+
+  return isGuest ? <PublicLayout>{reportMain}</PublicLayout> : reportMain
 }

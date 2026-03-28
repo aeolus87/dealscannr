@@ -65,5 +65,10 @@ class Settings(BaseSettings):
     # Optional: set to enable GET /api/scans/{id}/debug with header X-DealScannr-Debug-Secret
     scan_debug_secret: str | None = None
 
+    # Guest first scan: httpOnly cookie Secure flag (False for local HTTP)
+    guest_cookie_secure: bool = False
+    # Redis TTL for one guest scan per IP (seconds); default 7 days
+    guest_scan_ip_window_seconds: int = 604800
+
 
 settings = Settings()

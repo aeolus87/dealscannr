@@ -47,6 +47,51 @@ async def check_scan_rate_limit(user_id: str) -> bool:
                 pass
 
 
+async def check_guest_scan_ip_limit(client_ip: str) -> bool:
+    """True if this IP may start a guest scan (at most one per window)."""
+    try:
+        import redis.asyncio as redis_async
+    except Exception:
+        return True
+    r = None
+    try:
+        r = redis_async.from_url(settings.redis_url, decode_responses=True)
+        key = f"guest_scan_ip:{client_ip}"
+        exists = await r.exists(key)
+        return exists == 0
+    except Exception as e:
+        logger.warning("guest_scan_ip_limit_redis_fail allow: %s", e)
+        return True
+    finally:
+        if r is not None:
+            try:
+                await r.aclose()
+            except Exception:
+                pass
+
+
+async def mark_guest_scan_ip_used(client_ip: str) -> None:
+    """Record that this IP consumed a guest scan; TTL from settings."""
+    try:
+        import redis.asyncio as redis_async
+    except Exception:
+        return
+    r = None
+    try:
+        r = redis_async.from_url(settings.redis_url, decode_responses=True)
+        key = f"guest_scan_ip:{client_ip}"
+        ttl = int(getattr(settings, "guest_scan_ip_window_seconds", 604800) or 604800)
+        await r.set(key, "1", ex=ttl)
+    except Exception as e:
+        logger.warning("guest_scan_ip_mark_redis_fail: %s", e)
+    finally:
+        if r is not None:
+            try:
+                await r.aclose()
+            except Exception:
+                pass
+
+
 async def check_auth_ip_rate_limit(client_ip: str) -> bool:
     """100 requests per 60s per IP. True = allowed."""
     try:

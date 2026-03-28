@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Newspaper, Users, Wrench } from 'lucide-react'
 import { useScanStatusQuery } from '@/hooks/api/scans.hooks'
 import { readScanMeta } from '@/lib/scan-meta'
 import { StatusDot } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { PublicLayout } from '@/components/layout/PublicLayout'
 
 const LANES = ['litigation', 'engineering', 'hiring', 'news'] as const
 
@@ -46,8 +47,10 @@ function formatElapsed(totalSec: number): string {
 export function ScanProgress() {
   const { scanId } = useParams<{ scanId: string }>()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const isGuest = pathname.startsWith('/try/')
   const meta = readScanMeta(scanId)
-  const { data, error } = useScanStatusQuery(scanId)
+  const { data, error } = useScanStatusQuery(scanId, isGuest)
   const [flashed, setFlashed] = useState<Record<string, boolean>>({})
   const prevStatus = useRef<Record<string, string>>({})
   /** Re-render once per second while running so elapsed from `created_at` stays current. */
@@ -83,10 +86,11 @@ export function ScanProgress() {
   useEffect(() => {
     if (data?.status !== 'complete') return
     const t = window.setTimeout(() => {
-      navigate(`/scan/${scanId}/report`, { replace: true })
+      const reportPath = isGuest ? `/try/scan/${scanId}/report` : `/scan/${scanId}/report`
+      navigate(reportPath, { replace: true })
     }, 800)
     return () => window.clearTimeout(t)
-  }, [data?.status, navigate, scanId])
+  }, [data?.status, navigate, scanId, isGuest])
 
   useEffect(() => {
     if (!data || data.status === 'complete') return
@@ -136,8 +140,16 @@ export function ScanProgress() {
     return { text: 'Queued', className: 'text-[var(--textSubtle)]' }
   }
 
-  return (
-    <div className="mx-auto max-w-[640px] px-0 py-4 text-[var(--text)] lg:py-6">
+  const inner = (
+    <div className="mx-auto max-w-[640px] px-4 py-4 text-[var(--text)] lg:py-6">
+      {isGuest ? (
+        <p className="mb-4 rounded-[var(--radius-md)] border border-[var(--accentBorder)] bg-[var(--accentSoft)] px-3 py-2 text-center text-sm text-[var(--text)]">
+          <Link to="/register" className="font-medium text-[var(--accent)] underline">
+            Create a free account
+          </Link>{' '}
+          to save this scan and run more reports.
+        </p>
+      ) : null}
       <p className="font-mono text-xs text-[var(--textMuted)]">Scan {scanId ?? '…'}</p>
       <h1 className="mt-2 font-display text-2xl font-semibold lg:text-[28px]">
         {meta?.company?.trim() || 'Company'}
@@ -211,12 +223,14 @@ export function ScanProgress() {
       </div>
 
       <div className="mt-8 text-center">
-        <Link to="/dashboard">
+        <Link to={isGuest ? '/try' : '/dashboard'}>
           <Button variant="ghost" size="md">
-            Cancel — back to dashboard
+            {isGuest ? 'Cancel — back to trial scan' : 'Cancel — back to dashboard'}
           </Button>
         </Link>
       </div>
     </div>
   )
+
+  return isGuest ? <PublicLayout>{inner}</PublicLayout> : inner
 }

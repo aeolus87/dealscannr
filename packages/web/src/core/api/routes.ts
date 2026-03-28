@@ -28,6 +28,14 @@ export const ENTITY = {
   AUTOCOMPLETE: (q: string) => `/api/entity/autocomplete?q=${encodeURIComponent(q)}`,
 } as const
 
+export const GUEST = {
+  RESOLVE: () => '/api/guest/entity/resolve',
+  CONFIRM: () => '/api/guest/entity/confirm',
+  CREATE_SCAN: () => '/api/guest/scans',
+  STATUS: (scanId: string) => `/api/guest/scans/${encodeURIComponent(scanId)}/status`,
+  REPORT: (scanId: string) => `/api/guest/scans/${encodeURIComponent(scanId)}/report`,
+} as const
+
 export const SCANS = {
   CREATE: () => '/api/scans',
   HISTORY: (limit?: number) =>

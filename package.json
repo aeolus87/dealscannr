@@ -9,7 +9,10 @@
     "ingest": "bash scripts/ingest.sh",
     "test:api": "cd e2e && python -m pytest api/ -q",
     "test:web": "cd packages/web && npx tsc --noEmit",
+    "test:video": "cd packages/video && npm run typecheck",
     "test:e2e": "cd e2e/web && npx playwright test",
-    "test": "npm run test:api && npm run test:web"
+    "test": "npm run test:api && npm run test:web && npm run test:video",
+    "video:studio": "npm run studio -w @dealscannr/video",
+    "video:render": "npm run render -w @dealscannr/video"
   }
 }

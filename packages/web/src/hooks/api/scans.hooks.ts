@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import axiosInstance from '@/core/api/axios.instance'
-import { SCANS } from '@/core/api/routes'
+import guestAxios from '@/core/api/guest-axios.instance'
+import { GUEST, SCANS } from '@/core/api/routes'
 import type { ScanDiffPayload } from '@/components/scans/DiffModal'
 import type { HistoryRow, ScanReportPayload, ScanStatusPayload } from '@/hooks/api/types'
 
@@ -15,22 +16,24 @@ export function useScanHistoryQuery(enabled: boolean, limit = 10) {
   })
 }
 
-export function useScanReportQuery(scanId: string | undefined) {
+export function useScanReportQuery(scanId: string | undefined, guest?: boolean) {
   return useQuery({
-    queryKey: ['scan-report', scanId],
+    queryKey: ['scan-report', scanId, guest ? 'guest' : 'auth'],
     enabled: Boolean(scanId),
     retry: 1,
     queryFn: async () => {
-      const { data } = await axiosInstance.get<ScanReportPayload>(SCANS.REPORT(scanId!))
+      const path = guest ? GUEST.REPORT(scanId!) : SCANS.REPORT(scanId!)
+      const client = guest ? guestAxios : axiosInstance
+      const { data } = await client.get<ScanReportPayload>(path)
       return data
     },
   })
 }
 
-export function usePreviousScanQuery(scanId: string | undefined) {
+export function usePreviousScanQuery(scanId: string | undefined, guest?: boolean) {
   return useQuery({
-    queryKey: ['previous-scan', scanId],
-    enabled: Boolean(scanId),
+    queryKey: ['previous-scan', scanId, guest ? 'guest' : 'auth'],
+    enabled: Boolean(scanId) && !guest,
     retry: 0,
     queryFn: async () => {
       const { data } = await axiosInstance.get<{ previous_scan_id: string | null }>(
@@ -41,16 +44,18 @@ export function usePreviousScanQuery(scanId: string | undefined) {
   })
 }
 
-export function useScanStatusQuery(scanId: string | undefined) {
+export function useScanStatusQuery(scanId: string | undefined, guest?: boolean) {
   return useQuery({
-    queryKey: ['scan-status', scanId],
+    queryKey: ['scan-status', scanId, guest ? 'guest' : 'auth'],
     enabled: Boolean(scanId),
     refetchInterval: 2000,
     /** Default false: polling pauses in background tabs so lanes look stuck while elapsed still runs. */
     refetchIntervalInBackground: true,
     staleTime: 0,
     queryFn: async () => {
-      const { data } = await axiosInstance.get<ScanStatusPayload>(SCANS.STATUS(scanId!))
+      const path = guest ? GUEST.STATUS(scanId!) : SCANS.STATUS(scanId!)
+      const client = guest ? guestAxios : axiosInstance
+      const { data } = await client.get<ScanStatusPayload>(path)
       return data
     },
   })

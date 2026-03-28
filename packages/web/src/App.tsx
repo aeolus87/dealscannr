@@ -12,6 +12,7 @@ import { ScanProgress } from '@/pages/ScanProgress'
 import { ScanReport } from '@/pages/ScanReport'
 import { Settings } from '@/pages/Settings'
 import { SharedReport } from '@/pages/SharedReport'
+import { TryScan } from '@/pages/TryScan'
 import { Watchlist } from '@/pages/Watchlist'
 
 export default function App() {
@@ -26,6 +27,9 @@ export default function App() {
           <Route path="/methodology" element={<Methodology />} />
           <Route path="/share/:token" element={<SharedReport />} />
           <Route path="/report/:slug" element={<Report />} />
+          <Route path="/try" element={<TryScan />} />
+          <Route path="/try/scan/:scanId/progress" element={<ScanProgress />} />
+          <Route path="/try/scan/:scanId/report" element={<ScanReport />} />
 
           <Route element={<AppLayoutShell />}>
             <Route path="/dashboard" element={<Dashboard />} />

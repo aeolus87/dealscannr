@@ -256,6 +256,24 @@ def allow_scan_rate_limit(monkeypatch):
 
 
 @pytest.fixture
+def allow_guest_limits(monkeypatch):
+    """Guest scan: allow per-guest rate limit and IP window during tests."""
+
+    async def _ip_ok(_ip: str) -> bool:
+        return True
+
+    async def _rate_ok(_sub: str) -> bool:
+        return True
+
+    async def _mark_noop(_ip: str) -> None:
+        return None
+
+    monkeypatch.setattr("modules.guest.router.check_guest_scan_ip_limit", _ip_ok)
+    monkeypatch.setattr("modules.guest.router.mark_guest_scan_ip_used", _mark_noop)
+    monkeypatch.setattr("modules.guest.router.check_scan_rate_limit", _rate_ok)
+
+
+@pytest.fixture
 def block_scan_rate_limit(monkeypatch):
     async def _no(_uid: str) -> bool:
         return False
