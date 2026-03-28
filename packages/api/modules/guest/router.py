@@ -5,10 +5,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
@@ -30,10 +31,11 @@ from modules.scans.router import (
     _report_meta,
     _wikipedia_company_tagline,
 )
-from modules.guest.session import client_ip, ensure_guest_session
+from modules.guest.session import GUEST_COOKIE_NAME, client_ip, ensure_guest_session
 from rag.pipeline.llm_report_output import ensure_probe_questions
 from rag.schema.llm_report import ReportOutput, insufficient_validation_fallback
 from modules.scans.lanes import LANE_CONNECTORS
+from rag.connectors.http_client import safe_get
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,28 @@ class ConfirmBody(BaseModel):
 def _assert_guest_scan(scan: dict, guest_id: str) -> None:
     if scan.get("guest_session_id") != guest_id:
         raise_api_error(status_code=403, error="forbidden", message="Not allowed to access this scan")
+
+
+async def _require_guest_id_for_scan_access(db: Any, request: Request) -> str:
+    """
+    Do NOT mint a new guest session here — that would desync from the scan's guest_session_id
+    and cause 403 on poll. Only accept an existing ds_guest cookie.
+    """
+    raw = (request.cookies.get(GUEST_COOKIE_NAME) or "").strip()
+    if not raw:
+        raise_api_error(
+            status_code=401,
+            error="guest_session_required",
+            message="Trial session cookie missing. Use the same browser and keep cookies enabled.",
+        )
+    doc = await db.guest_sessions.find_one({"guest_id": raw})
+    if not doc:
+        raise_api_error(
+            status_code=401,
+            error="guest_session_invalid",
+            message="Trial session not found. Start again from Try scan.",
+        )
+    return raw
 
 
 @router.post("/entity/resolve")
@@ -170,11 +194,41 @@ async def guest_create_scan(request: Request, response: Response, body: ScanCrea
     return {"scan_id": scan_id, "status": "running"}
 
 
-@router.get("/scans/{scan_id}/status")
-async def guest_scan_status(scan_id: str, request: Request, response: Response):
+@router.get("/entity/autocomplete")
+async def guest_entity_autocomplete(
+    request: Request,
+    response: Response,
+    q: str = Query("", max_length=200),
+):
+    """Clearbit suggest; mints guest cookie on first use (same as resolve)."""
     db = get_database()
-    ip = client_ip(request)
-    guest_id = await ensure_guest_session(db, request, response, ip=ip)
+    await ensure_guest_session(db, request, response, ip=client_ip(request))
+    raw = (q or "").strip()
+    if len(raw) < 2:
+        return []
+    try:
+        resp = await safe_get(
+            "https://autocomplete.clearbit.com/v1/companies/suggest",
+            params={"query": raw},
+            timeout=10.0,
+        )
+    except Exception:
+        return []
+    if resp.status_code != 200:
+        return []
+    try:
+        data = resp.json()
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    return data[:8]
+
+
+@router.get("/scans/{scan_id}/status")
+async def guest_scan_status(scan_id: str, request: Request):
+    db = get_database()
+    guest_id = await _require_guest_id_for_scan_access(db, request)
 
     oid = _as_oid(scan_id)
     scan = await db.scans.find_one({"_id": oid})
@@ -210,10 +264,9 @@ async def guest_scan_status(scan_id: str, request: Request, response: Response):
 
 
 @router.get("/scans/{scan_id}/report")
-async def guest_scan_report(scan_id: str, request: Request, response: Response):
+async def guest_scan_report(scan_id: str, request: Request):
     db = get_database()
-    ip = client_ip(request)
-    guest_id = await ensure_guest_session(db, request, response, ip=ip)
+    guest_id = await _require_guest_id_for_scan_access(db, request)
 
     oid = _as_oid(scan_id)
     scan = await db.scans.find_one({"_id": oid})

@@ -11,8 +11,8 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md">
+    <div className="flex min-h-0 min-h-[100dvh] flex-1 flex-col bg-[var(--bg)] text-[var(--text)]">
+      <header className="sticky top-0 z-30 shrink-0 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 lg:px-6">
           <Link to="/" className="font-display text-lg font-semibold text-[var(--accent)]">
             DealScannr
@@ -122,9 +122,9 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {children}
+      <main className="flex min-h-0 w-full min-w-0 flex-1 flex-col">{children}</main>
 
-      <footer className="border-t border-[var(--border)] bg-[var(--surface)] py-10">
+      <footer className="mt-auto shrink-0 border-t border-[var(--border)] bg-[var(--surface)] py-10">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 lg:flex-row lg:items-start lg:justify-between lg:px-6">
           <div>
             <p className="font-display font-semibold text-[var(--accent)]">DealScannr</p>

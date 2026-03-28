@@ -28,8 +28,8 @@ export default function App() {
           <Route path="/share/:token" element={<SharedReport />} />
           <Route path="/report/:slug" element={<Report />} />
           <Route path="/try" element={<TryScan />} />
-          <Route path="/try/scan/:scanId/progress" element={<ScanProgress />} />
-          <Route path="/try/scan/:scanId/report" element={<ScanReport />} />
+          <Route path="/try/scan/:scanId/progress" element={<ScanProgress guestMode />} />
+          <Route path="/try/scan/:scanId/report" element={<ScanReport guestMode />} />
 
           <Route element={<AppLayoutShell />}>
             <Route path="/dashboard" element={<Dashboard />} />

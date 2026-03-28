@@ -48,7 +48,8 @@ export function useScanStatusQuery(scanId: string | undefined, guest?: boolean) 
   return useQuery({
     queryKey: ['scan-status', scanId, guest ? 'guest' : 'auth'],
     enabled: Boolean(scanId),
-    refetchInterval: 2000,
+    /** Guest trial: poll faster so progress feels responsive. */
+    refetchInterval: guest ? 1000 : 2000,
     /** Default false: polling pauses in background tabs so lanes look stuck while elapsed still runs. */
     refetchIntervalInBackground: true,
     staleTime: 0,

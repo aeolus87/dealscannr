@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import axios from 'axios'
 import { X } from 'lucide-react'
+import guestAxios from '@/core/api/guest-axios.instance'
+import { GUEST } from '@/core/api/routes'
 import {
   useGuestConfirmEntityMutation,
   useGuestCreateScanMutation,
   useGuestResolveEntityMutation,
 } from '@/hooks/api/guest.hooks'
 import { getAxiosStatus } from '@/hooks/api/http'
-import type { EntityCandidate } from '@/hooks/api/types'
+import type { ClearbitSuggestion, EntityCandidate } from '@/hooks/api/types'
 import { useToast } from '@/components/ui/ToastContext'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -46,6 +50,10 @@ export function TryScan() {
   const [err, setErr] = useState<string | null>(null)
   const [inputFocus, setInputFocus] = useState(false)
   const [pendingAuto, setPendingAuto] = useState(false)
+  const [suggestions, setSuggestions] = useState<ClearbitSuggestion[]>([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [highlightIndex, setHighlightIndex] = useState(-1)
+  const scanInputWrapRef = useRef<HTMLDivElement>(null)
 
   const busy = resolveMut.isPending || confirmMut.isPending || createScanMut.isPending
 
@@ -65,6 +73,60 @@ export function TryScan() {
       setSearchParams(next, { replace: true })
     }
   }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) {
+      setSuggestions([])
+      setShowDropdown(false)
+      setHighlightIndex(-1)
+      return
+    }
+    const ac = new AbortController()
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await guestAxios.get<ClearbitSuggestion[]>(GUEST.AUTOCOMPLETE(q), {
+            signal: ac.signal,
+          })
+          const data = Array.isArray(res.data) ? res.data.slice(0, 6) : []
+          setSuggestions(data)
+          setShowDropdown(data.length > 0)
+          setHighlightIndex(-1)
+        } catch (e: unknown) {
+          if (axios.isCancel(e)) return
+          const code = (e as { code?: string }).code
+          if (code === 'ERR_CANCELED') return
+          setSuggestions([])
+          setShowDropdown(false)
+        }
+      })()
+    }, 300)
+    return () => {
+      window.clearTimeout(timer)
+      ac.abort()
+    }
+  }, [query])
+
+  useEffect(() => {
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (scanInputWrapRef.current?.contains(e.target as Node)) return
+      setShowDropdown(false)
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [])
+
+  const openManualDomainEntry = useCallback(() => {
+    setShowDropdown(false)
+    setHighlightIndex(-1)
+    setDisambiguationOpen(true)
+    setNoMatchMode(true)
+    setCandidates([])
+    setPick('manual')
+    setManualDomain('')
+    setErr(null)
+  }, [])
 
   const confirmAndStart = useCallback(
     async (c: EntityCandidate | null, manual?: string) => {
@@ -120,8 +182,27 @@ export function TryScan() {
     [query, confirmMut, createScanMut, navigate, toast],
   )
 
+  const selectClearbitSuggestion = useCallback(
+    (s: ClearbitSuggestion) => {
+      setQuery(s.name)
+      setShowDropdown(false)
+      setHighlightIndex(-1)
+      setSuggestions([])
+      const c: EntityCandidate = {
+        candidate_id: null,
+        legal_name: s.name,
+        domain: s.domain,
+        confidence: 0.97,
+        source: 'clearbit',
+      }
+      void confirmAndStart(c)
+    },
+    [confirmAndStart],
+  )
+
   const submitScan = useCallback(async () => {
     if (!query.trim()) return
+    setShowDropdown(false)
     setErr(null)
     setNoMatchMode(false)
     setDisambiguationOpen(false)
@@ -158,6 +239,44 @@ export function TryScan() {
     }
   }, [query, resolveMut, confirmAndStart, toast])
 
+  const handleScanInputKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (!showDropdown || suggestions.length === 0) return
+      const total = suggestions.length + 1
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setShowDropdown(false)
+        setHighlightIndex(-1)
+        return
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setHighlightIndex((prev) => (prev < 0 ? 0 : (prev + 1) % total))
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setHighlightIndex((prev) => (prev < 0 ? total - 1 : (prev - 1 + total) % total))
+        return
+      }
+      if (e.key === 'Enter' && highlightIndex >= 0) {
+        e.preventDefault()
+        if (highlightIndex < suggestions.length) {
+          selectClearbitSuggestion(suggestions[highlightIndex])
+        } else {
+          openManualDomainEntry()
+        }
+      }
+    },
+    [
+      showDropdown,
+      suggestions,
+      highlightIndex,
+      selectClearbitSuggestion,
+      openManualDomainEntry,
+    ],
+  )
+
   useEffect(() => {
     if (!pendingAuto || !query.trim()) return
     setPendingAuto(false)
@@ -184,7 +303,7 @@ export function TryScan() {
 
   return (
     <PublicLayout>
-      <div className="mx-auto max-w-3xl px-4 py-8 text-[var(--text)]">
+      <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-4 py-8 text-[var(--text)]">
         <PageHeader
           title="Try your first scan"
           actions={
@@ -226,7 +345,7 @@ export function TryScan() {
             }}
             className="flex flex-col gap-3 sm:flex-row sm:items-stretch"
           >
-            <div className="relative min-w-0 flex-1">
+            <div ref={scanInputWrapRef} className="relative min-w-0 flex-1">
               <div
                 className={`relative flex min-h-12 items-center rounded-[var(--radius-md)] border bg-[var(--surface)] transition-shadow sm:min-h-[48px] ${
                   inputFocus
@@ -241,21 +360,79 @@ export function TryScan() {
                   onChange={(e) => setQuery(e.target.value)}
                   onFocus={() => setInputFocus(true)}
                   onBlur={() => setInputFocus(false)}
+                  onKeyDown={handleScanInputKeyDown}
                   disabled={busy}
                   aria-label="Company name or domain"
+                  aria-expanded={showDropdown && suggestions.length > 0}
+                  aria-controls="try-scan-autocomplete-list"
                   autoComplete="off"
+                  role="combobox"
                 />
                 {query ? (
                   <button
                     type="button"
                     className="absolute right-2 rounded p-1 text-[var(--textMuted)] hover:bg-[var(--surface2)] hover:text-[var(--text)]"
                     aria-label="Clear"
-                    onClick={() => setQuery('')}
+                    onClick={() => {
+                      setQuery('')
+                      setSuggestions([])
+                      setShowDropdown(false)
+                    }}
                   >
                     <X className="h-4 w-4" />
                   </button>
                 ) : null}
               </div>
+              {showDropdown && suggestions.length > 0 ? (
+                <div
+                  id="try-scan-autocomplete-list"
+                  role="listbox"
+                  className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-md)]"
+                >
+                  {suggestions.map((s, i) => (
+                    <div
+                      key={`${s.domain}-${i}`}
+                      role="option"
+                      aria-selected={highlightIndex === i}
+                      className={`flex cursor-pointer items-center gap-3 border-b border-[var(--border)] px-3.5 py-2.5 last:border-b-0 ${
+                        highlightIndex === i ? 'bg-[var(--surface2)]' : 'bg-transparent'
+                      }`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onMouseEnter={() => setHighlightIndex(i)}
+                      onClick={() => selectClearbitSuggestion(s)}
+                    >
+                      {s.logo ? (
+                        <img
+                          src={s.logo}
+                          alt=""
+                          width={20}
+                          height={20}
+                          className="shrink-0 rounded object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      ) : (
+                        <span className="h-5 w-5 shrink-0" aria-hidden />
+                      )}
+                      <span className="text-sm font-medium text-[var(--text)]">{s.name}</span>
+                      <span className="ml-auto font-mono text-xs text-[var(--textMuted)]">{s.domain}</span>
+                    </div>
+                  ))}
+                  <div
+                    role="option"
+                    aria-selected={highlightIndex === suggestions.length}
+                    className={`cursor-pointer px-3.5 py-2 text-xs text-[var(--textMuted)] ${
+                      highlightIndex === suggestions.length ? 'bg-[var(--surface2)]' : ''
+                    }`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseEnter={() => setHighlightIndex(suggestions.length)}
+                    onClick={() => openManualDomainEntry()}
+                  >
+                    Not listed? Enter domain manually →
+                  </div>
+                </div>
+              ) : null}
             </div>
             <Button type="submit" variant="primary" size="lg" loading={busy} disabled={!query.trim()}>
               Scan

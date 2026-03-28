@@ -134,11 +134,13 @@ function ConfidenceBar({ value }: { value: number }) {
   )
 }
 
-export function ScanReport() {
+type ScanReportProps = { guestMode?: boolean }
+
+export function ScanReport({ guestMode }: ScanReportProps = {}) {
   const { scanId } = useParams<{ scanId: string }>()
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const isGuest = pathname.startsWith('/try/')
+  const isGuest = guestMode === true || pathname.startsWith('/try/')
   const { toast } = useToast()
   const meta = readScanMeta(scanId)
   const [shareOpen, setShareOpen] = useState(false)

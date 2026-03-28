@@ -44,11 +44,13 @@ function formatElapsed(totalSec: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
-export function ScanProgress() {
+type ScanProgressProps = { guestMode?: boolean }
+
+export function ScanProgress({ guestMode }: ScanProgressProps = {}) {
   const { scanId } = useParams<{ scanId: string }>()
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const isGuest = pathname.startsWith('/try/')
+  const isGuest = guestMode === true || pathname.startsWith('/try/')
   const meta = readScanMeta(scanId)
   const { data, error } = useScanStatusQuery(scanId, isGuest)
   const [flashed, setFlashed] = useState<Record<string, boolean>>({})
