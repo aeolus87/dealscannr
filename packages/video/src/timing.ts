@@ -1,13 +1,12 @@
-/** 30 fps timeline — total ~82s */
 export const FPS = 30;
 
 export const FRAMES = {
-  hook: 300,
-  problem: 420,
-  product: 300,
-  rag: 660,
-  investor: 540,
-  cta: 240,
+  hook: 120,
+  problem: 150,
+  product: 210,
+  rag: 180,
+  investor: 165,
+  cta: 105,
 } as const;
 
 export const FRAME_START = {
@@ -32,3 +31,6 @@ export const TOTAL_FRAMES =
   FRAMES.rag +
   FRAMES.investor +
   FRAMES.cta;
+
+export const SNAP = { damping: 22, mass: 0.35, stiffness: 280 } as const;
+export const SLAM = { damping: 12, mass: 0.3, stiffness: 350 } as const;

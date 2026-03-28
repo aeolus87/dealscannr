@@ -1,4 +1,3 @@
-import React from "react";
 import { Sequence } from "remotion";
 import { FRAMES, FRAME_START, TOTAL_FRAMES } from "../timing";
 import { Cta } from "../sequences/Cta";
@@ -11,8 +10,8 @@ import { ProductMoment } from "../sequences/ProductMoment";
 export const introXMetadata = {
   durationInFrames: TOTAL_FRAMES,
   fps: 30,
-  width: 1080,
-  height: 1920,
+  width: 1920,
+  height: 1080,
 };
 
 export function IntroX() {

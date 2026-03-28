@@ -1,8 +1,7 @@
-import React from "react";
 import { Composition, registerRoot } from "remotion";
 import { IntroX, introXMetadata } from "./compositions/IntroX";
 
-const RemotionRoot: React.FC = () => {
+const RemotionRoot = () => {
   return (
     <>
       <Composition
