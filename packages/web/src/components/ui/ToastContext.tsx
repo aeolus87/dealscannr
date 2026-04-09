@@ -46,7 +46,7 @@ const typeBar: Record<ToastType, string> = {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
-  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const timers = useRef<Map<string, number>>(new Map())
 
   const dismiss = useCallback((id: string) => {
     const t = timers.current.get(id)
