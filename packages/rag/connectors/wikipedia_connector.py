@@ -30,7 +30,7 @@ def _domain_keyword(domain: str) -> str:
 class WikipediaConnector(BaseConnector):
     connector_id = "wikipedia"
     lane = "news"
-    timeout_seconds = 15
+    timeout_seconds = 10
 
     async def _fetch_impl(
         self,
@@ -55,7 +55,7 @@ class WikipediaConnector(BaseConnector):
         title_path = quote(_wiki_title_path(name), safe="_-.'(),:")
         summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{title_path}"
         try:
-            resp = await safe_get(summary_url, headers=WIKI_HEADERS, timeout=15.0, follow_redirects=True)
+            resp = await safe_get(summary_url, headers=WIKI_HEADERS, timeout=8.0, follow_redirects=True)
             if resp.status_code == 200:
                 data = resp.json()
                 extract = (data.get("extract") or "").strip()
@@ -103,7 +103,7 @@ class WikipediaConnector(BaseConnector):
                     search_url,
                     params=params,
                     headers=WIKI_HEADERS,
-                    timeout=15.0,
+                    timeout=8.0,
                     follow_redirects=True,
                 )
                 if resp.status_code == 200:

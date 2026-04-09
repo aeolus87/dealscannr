@@ -256,7 +256,7 @@ async def _fetch_item_1a_risk_factors(src: dict[str, Any], headers: dict[str, st
         return None
     doc_url = f"https://www.sec.gov/Archives/edgar/data/{cik_seg}/{nodash}/{primary}"
     try:
-        r2 = await safe_get(doc_url, headers=headers, timeout=12.0, follow_redirects=True)
+        r2 = await safe_get(doc_url, headers=headers, timeout=8.0, follow_redirects=True)
         if r2.status_code != 200:
             return None
         return _extract_item_1a_text(r2.text, max_chars=3000)

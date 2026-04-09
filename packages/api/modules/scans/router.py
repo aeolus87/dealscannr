@@ -97,17 +97,17 @@ def _friendly_lane_error(raw_errors: list[str], lane: str) -> str | None:
     if not raw_errors:
         return None
     raw = " ".join(raw_errors).lower()
-    if "no_results" in raw or "no_sec_hits" in raw or "no_news" in raw:
-        return "No matching records found for this company"
-    if "no api key" in raw:
-        return "Data source requires configuration"
+    if "no_results" in raw or "no_sec_hits" in raw or "no_news" in raw or "no hits" in raw:
+        return "No matching records found"
+    if "not_configured" in raw or "no api key" in raw or "missing" in raw:
+        return None
     if "no_github_org_found" in raw:
         return "No public GitHub presence detected"
     if "no_hiring_signal" in raw:
         return "No verified open roles found"
     if "no wikipedia hit" in raw:
         return None
-    if "timeout" in raw or "deadline_exceeded" in raw:
+    if "timeout" in raw or "deadline_exceeded" in raw or "timed" in raw:
         return "Data source responded too slowly — will retry on rescan"
     if "source_unavailable" in raw:
         return "Data source temporarily unreachable"

@@ -14,6 +14,28 @@ def normalize_connector_text(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
 
 
+_ERROR_MAP: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"timeout|timed?\s*out|deadline", re.I), "timeout"),
+    (re.compile(r"no_results|no_sec_hits|no_news|no hits", re.I), "no_results"),
+    (re.compile(r"no_github_org_found", re.I), "no_github_org_found"),
+    (re.compile(r"no_hiring_signal", re.I), "no_hiring_signal"),
+    (re.compile(r"no wikipedia hit", re.I), "no_results"),
+    (re.compile(r"no api key|missing.*key|not configured", re.I), "not_configured"),
+    (re.compile(r"ssrf|blocked|not allowed", re.I), "source_unavailable"),
+    (re.compile(r"status.*(4\d\d|5\d\d)|http.*error|\b(403|429|500|502|503)\b", re.I), "source_unavailable"),
+]
+
+
+def _sanitize_error(raw: str | None) -> str:
+    """Collapse raw connector errors into a short, stable tag for DB storage."""
+    if not raw:
+        return "source_unavailable"
+    for pattern, tag in _ERROR_MAP:
+        if pattern.search(raw):
+            return tag
+    return "source_unavailable"
+
+
 @dataclass
 class RawChunk:
     source_url: str
@@ -39,7 +61,7 @@ class ConnectorResult:
 class BaseConnector(ABC):
     connector_id: str
     lane: str
-    timeout_seconds: int = 15
+    timeout_seconds: int = 10
 
     def __init__(self, settings: ConnectorSettings | None = None):
         self.settings = settings or ConnectorSettings()
@@ -96,8 +118,8 @@ class BaseConnector(ABC):
                 return result
             last_error = result.error or "failed"
             if attempt < max_retries:
-                await asyncio.sleep(1)
-        return self.empty_result(f"source_unavailable:{last_error}")
+                await asyncio.sleep(0.3)
+        return self.empty_result(_sanitize_error(last_error))
 
     def empty_result(self, error: str) -> ConnectorResult:
         return ConnectorResult(

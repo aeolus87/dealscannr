@@ -46,6 +46,20 @@ function formatElapsed(totalSec: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
+function friendlyError(raw?: string | null): string {
+  if (!raw) return 'Source unavailable'
+  const lc = raw.toLowerCase()
+  if (/no.*match|no_results|no_sec_hits|no_news|no hits/i.test(lc))
+    return 'No matching records found'
+  if (/no.*github|no_github/i.test(lc)) return 'No public GitHub presence detected'
+  if (/no.*hiring|no_hiring/i.test(lc)) return 'No open roles found'
+  if (/timeout|deadline|too slow/i.test(lc))
+    return 'Data source responded too slowly — will retry on rescan'
+  if (/unavailable|unreachable|temporarily/i.test(lc)) return 'Source temporarily unavailable'
+  if (/[_:]/.test(raw) || raw.length > 60) return 'Source temporarily unavailable'
+  return raw
+}
+
 type ScanProgressProps = { guestMode?: boolean }
 
 export function ScanProgress({ guestMode }: ScanProgressProps = {}) {
@@ -145,7 +159,7 @@ export function ScanProgress({ guestMode }: ScanProgressProps = {}) {
   function laneStatusText(lane: (typeof LANES)[number], status: string, error?: string | null) {
     if (status === 'complete') return { text: 'Complete', className: 'text-[var(--green)]' }
     if (status === 'failed') {
-      const label = error || 'Source unavailable'
+      const label = friendlyError(error)
       return { text: label, className: 'text-[var(--textMuted)]' }
     }
     if (status === 'partial') return { text: 'Partial data', className: 'text-[var(--yellow)]' }
@@ -224,7 +238,7 @@ export function ScanProgress({ guestMode }: ScanProgressProps = {}) {
         })}
       </ul>
 
-      <p className="mt-8 text-center text-sm text-[var(--textMuted)]">Results typically ready in under 60 seconds</p>
+      <p className="mt-8 text-center text-sm text-[var(--textMuted)]">Results ready in under a minute</p>
       <div
         className="ds-scan-progress-track mt-4 ring-1 ring-[var(--border)] ring-inset"
         role="progressbar"

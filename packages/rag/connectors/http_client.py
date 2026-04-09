@@ -101,7 +101,7 @@ def validate_http_url(url: str, *, entity_domain: str | None = None) -> None:
 async def safe_get(url: str, **kwargs: Any) -> httpx.Response:
     entity_domain = kwargs.pop("entity_domain", None)
     validate_http_url(url, entity_domain=entity_domain)
-    timeout = kwargs.pop("timeout", 12.0)
+    timeout = kwargs.pop("timeout", 8.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
         return await client.get(url, **kwargs)
 
@@ -109,7 +109,7 @@ async def safe_get(url: str, **kwargs: Any) -> httpx.Response:
 async def safe_post(url: str, **kwargs: Any) -> httpx.Response:
     entity_domain = kwargs.pop("entity_domain", None)
     validate_http_url(url, entity_domain=entity_domain)
-    timeout = kwargs.pop("timeout", 12.0)
+    timeout = kwargs.pop("timeout", 8.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
         return await client.post(url, **kwargs)
 
@@ -117,7 +117,7 @@ async def safe_post(url: str, **kwargs: Any) -> httpx.Response:
 async def safe_head(url: str, **kwargs: Any) -> httpx.Response:
     entity_domain = kwargs.pop("entity_domain", None)
     validate_http_url(url, entity_domain=entity_domain)
-    timeout = kwargs.pop("timeout", 12.0)
+    timeout = kwargs.pop("timeout", 8.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
         return await client.head(url, **kwargs)
 
@@ -125,7 +125,7 @@ async def safe_head(url: str, **kwargs: Any) -> httpx.Response:
 def safe_get_sync(url: str, **kwargs: Any) -> httpx.Response:
     entity_domain = kwargs.pop("entity_domain", None)
     validate_http_url(url, entity_domain=entity_domain)
-    timeout = kwargs.pop("timeout", 12.0)
+    timeout = kwargs.pop("timeout", 8.0)
     with httpx.Client(timeout=timeout) as client:
         return client.get(url, **kwargs)
 
@@ -133,7 +133,7 @@ def safe_get_sync(url: str, **kwargs: Any) -> httpx.Response:
 def safe_post_sync(url: str, **kwargs: Any) -> httpx.Response:
     entity_domain = kwargs.pop("entity_domain", None)
     validate_http_url(url, entity_domain=entity_domain)
-    timeout = kwargs.pop("timeout", 12.0)
+    timeout = kwargs.pop("timeout", 8.0)
     with httpx.Client(timeout=timeout) as client:
         return client.post(url, **kwargs)
 

@@ -157,7 +157,7 @@ async def _run_connector_with_db_updates(
         result = await connector.fetch_with_retry(entity_id, scan_id, legal_name, domain)
     except Exception as e:
         logger.exception("connector_fetch_crash %s", connector.connector_id)
-        result = connector.empty_result(str(e))
+        result = connector.empty_result("source_unavailable")
     duration_ms = int((time.perf_counter() - t0) * 1000)
     await db.connector_runs.update_one(
         {"scan_id": scan_id, "connector_name": connector.connector_id},
@@ -231,7 +231,7 @@ async def run_scan_pipeline(
         ]
     )
 
-    CONNECTOR_PHASE_TIMEOUT = 45
+    CONNECTOR_PHASE_TIMEOUT = 25
     try:
         results = await asyncio.wait_for(
             asyncio.gather(
@@ -263,9 +263,9 @@ async def run_scan_pipeline(
                 if run and run.get("status") == "running":
                     await db.connector_runs.update_one(
                         {"scan_id": scan_id, "connector_name": c.connector_id},
-                        {"$set": {"status": "failed", "error": "deadline_exceeded", "updated_at": datetime.now(timezone.utc)}},
+                        {"$set": {"status": "failed", "error": "timeout", "updated_at": datetime.now(timezone.utc)}},
                     )
-                results.append(c.empty_result("deadline_exceeded"))
+                results.append(c.empty_result("timeout"))
 
     all_raw: list[RawChunk] = []
     for r in results:
@@ -403,9 +403,6 @@ async def run_scan_pipeline(
             )
         except Exception as e:
             logger.error("scan_qdrant_upsert_failed: %s", e)
-
-    if points and app_settings.qdrant_url:
-        await asyncio.sleep(0.5)
 
     scan_doc = await db.scans.find_one({"_id": oid}, {"created_at": 1})
     scan_created_at = scan_doc.get("created_at") if scan_doc else None
