@@ -11,7 +11,7 @@ test('register and login flow', async ({ page }) => {
   await page.goto('/login')
   await page.locator('#login-email').fill('u@test.co')
   await page.locator('#login-password').fill('password12345')
-  await page.getByRole('button', { name: /sign in/i }).click()
+  await page.locator('form').getByRole('button', { name: /sign in/i }).click()
   await expect(page).toHaveURL(/\/dashboard/)
 })
 
