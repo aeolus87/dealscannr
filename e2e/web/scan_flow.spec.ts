@@ -113,7 +113,7 @@ test('full scan flow with mocked API', async ({ page }) => {
   // High confidence single match → auto-starts, navigates to progress
   await expect(page).toHaveURL(/\/scan\/test-123\/progress/, { timeout: 10_000 })
   await expect(page).toHaveURL(/\/scan\/test-123\/report/, { timeout: 15_000 })
-  await expect(page.getByText('MEET')).toBeVisible()
+  await expect(page.getByText('MEET').first()).toBeVisible()
   await expect(page.getByText(/Disclaimer text/)).toBeVisible()
 })
 
@@ -177,5 +177,5 @@ test('402 shows credits error on dashboard', async ({ page }) => {
   await page.goto('/dashboard')
   await page.getByLabel(/company name or domain/i).fill('X')
   await page.getByRole('button', { name: /scan/i }).click()
-  await expect(page.getByText(/no scan credits/i)).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('alert').getByText(/no scan credits/i)).toBeVisible({ timeout: 10_000 })
 })
